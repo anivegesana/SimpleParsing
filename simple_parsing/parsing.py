@@ -1118,15 +1118,23 @@ def _create_dataclass_instance(
     constructor: Callable[..., DataclassT],
     constructor_args: dict[str, Any],
 ) -> DataclassT | None:
-
     # Check if the dataclass annotation is marked as Optional.
     # In this case, if no arguments were passed, and the default value is None, then return
     # None.
     # TODO: (BUG!) This doesn't distinguish the case where the defaults are passed via the
     # command-line from the case where no arguments are passed at all!
+    if "_type_" in constructor_args:
+        from simple_parsing.helpers.serialization.serializable import _locate
+
+        dc_type_in_config_file = _locate(constructor_args.pop("_type_"))
+        logger.info(
+            f"Overwriting constructor with the dc type from the config file: "
+            f"{constructor}->{dc_type_in_config_file}"
+        )
+        constructor = dc_type_in_config_file
+
     if wrapper.optional and wrapper.default is None:
         for field_wrapper in wrapper.fields:
-
             arg_value = constructor_args[field_wrapper.name]
             default_value = field_wrapper.default
             logger.debug(
