@@ -10,8 +10,9 @@ from typing import List, Optional, Union
 
 import pytest
 
-from simple_parsing import ArgumentParser
+from simple_parsing import ArgumentParser, parse
 from simple_parsing.docstring import get_attribute_docstring
+from simple_parsing.helpers.serialization import load, save
 
 from .testutils import TestSetup, raises_invalid_choice
 
@@ -1266,7 +1267,6 @@ class TrainingArguments(TestSetup):
 
 @pytest.mark.xfail(reason="docstring_parser can't parse the docstring of TrainingArguments!")
 def test_docstring_parse_works_with_hf_training_args():
-
     assert get_attribute_docstring(TrainingArguments, "output_dir").desc_from_cls_docstring == (
         "The output directory where the model predictions and checkpoints will be written."
     )
@@ -1292,8 +1292,20 @@ def test_entire_docstring_isnt_used_as_help():
 @pytest.mark.parametrize("filename", ["bob.yaml", "bob.json", "bob.pkl", "bob.yml"])
 def test_serialization(tmp_path: Path, filename: str, args: TrainingArguments):
     """test that serializing / deserializing a TrainingArguments works."""
-    from simple_parsing.helpers.serialization import load, save
 
     path = tmp_path / filename
     save(args, path)
     assert load(TrainingArguments, path) == args
+
+
+@pytest.mark.xfail(
+    raises=TypeError,
+    strict=True,
+    reason="All fields (non-init ones too) are passed to .set_defaults, which raises a TypeError",
+)
+@pytest.mark.parametrize("filetype", [".yaml", ".json", ".pkl"])
+def test_parse_with_config_file(tmp_path: Path, filetype: str):
+    default_args = TrainingArguments(label_smoothing_factor=123.123)
+    config_path = (tmp_path / "bob").with_suffix(filetype)
+    save(default_args, config_path, save_dc_types=True)
+    assert parse(TrainingArguments, config_path=config_path, args="") == default_args
