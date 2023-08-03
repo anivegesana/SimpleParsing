@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable, TypeVar
 
 import pytest
+from simple_parsing.helpers.serialization import save
 from pytest_regressions.file_regression import FileRegressionFixture
 from typing_extensions import Annotated
 
@@ -244,7 +245,6 @@ def test_two_subgroups_with_conflict(args_str: str, expected: TwoSubgroupsWithCo
 
 
 def test_subgroups_with_key_default() -> None:
-
     with pytest.raises(ValueError):
         subgroups({"a": A, "b": B}, default_factory="a")
 
@@ -270,7 +270,9 @@ def test_subgroup_default_needs_to_be_key_in_dict():
 
 
 def test_subgroup_default_factory_needs_to_be_value_in_dict():
-    with pytest.raises(ValueError, match="`default_factory` must be a value in the subgroups dict"):
+    with pytest.raises(
+        ValueError, match="`default_factory` must be a value in the subgroups dict"
+    ):
         _ = subgroups({"a": B, "aa": A}, default_factory=C)
 
 
@@ -467,6 +469,7 @@ def test_help_string_displays_default_factory_arguments(
     When using `functools.partial` or lambda expressions, we'd ideally also like the help text to
     show the field values from inside the `partial` or lambda, if possible.
     """
+
     # NOTE: Here we need to return just A() and B() with these default factories, so the defaults
     # for the fields are the same
     @dataclass
@@ -585,7 +588,6 @@ class ModelBConfig(ModelConfig):
 
 @dataclass
 class Config(TestSetup):
-
     # Which model to use
     model: ModelConfig = subgroups(
         {"model_a": ModelAConfig, "model_b": ModelBConfig},
@@ -666,7 +668,9 @@ def test_annotated_as_subgroups():
 
     @dataclasses.dataclass
     class Config(TestSetup):
-        model: Model = subgroups({"small": SmallModel, "big": BigModel}, default_factory=SmallModel)
+        model: Model = subgroups(
+            {"small": SmallModel, "big": BigModel}, default_factory=SmallModel
+        )
 
     assert Config.setup().model == SmallModel()
     # Hopefully this illustrates why Annotated aren't exactly great:
@@ -880,7 +884,6 @@ class Dataset2Config(DatasetConfig):
 
 @dataclass
 class Config(TestSetup):
-
     # Which model to use
     model: ModelConfig = subgroups(
         {"model_a": ModelAConfig, "model_b": ModelBConfig},
@@ -931,3 +934,39 @@ def test_ordering_of_args_doesnt_matter():
         model=ModelAConfig(lr=0.0003, optimizer="Adam", betas=(0.0, 1.0)),
         dataset=Dataset2Config(data_dir="data/bar", bar=1.2),
     )
+
+
+@dataclass
+class A1:
+    a_val: int = 1
+
+
+@dataclass
+class A2:
+    a_val: int = 2
+
+
+@dataclass
+class A1OrA2:
+    a: A1 | A2 = subgroups({"a1": A1, "a2": A2}, default="a1")
+
+
+@pytest.mark.parametrize(
+    ("value_in_config", "args", "expected"),
+    [
+        (A1OrA2(a=A2()), "", A1OrA2(a=A1())),
+        (A1OrA2(a=A1()), "", A1OrA2(a=A1())),
+    ],
+)
+@pytest.mark.parametrize("filetype", [".yaml", ".json", ".pkl"])
+def test_parse_with_config_file_with_different_subgroup(
+    tmp_path: Path,
+    filetype: str,
+    value_in_config: A1OrA2,
+    args: str,
+    expected: A1OrA2,
+):
+    config_path = (tmp_path / "bob").with_suffix(filetype)
+
+    save(value_in_config, config_path, save_dc_types=True)
+    assert parse(A1OrA2, config_path=config_path, args=args) == expected
