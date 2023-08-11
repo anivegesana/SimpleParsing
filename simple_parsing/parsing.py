@@ -14,7 +14,7 @@ from argparse import SUPPRESS, Action, HelpFormatter, Namespace, _
 from collections import defaultdict
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Callable, Sequence, Type, overload
+from typing import Any, Callable, Sequence, Type, cast, overload
 
 from simple_parsing.helpers.subgroups import SubgroupKey
 from simple_parsing.wrappers.dataclass_wrapper import DataclassWrapperType
@@ -22,7 +22,7 @@ from simple_parsing.wrappers.dataclass_wrapper import DataclassWrapperType
 from . import utils
 from .conflicts import ConflictResolution, ConflictResolver
 from .help_formatter import SimpleHelpFormatter
-from .helpers.serialization.serializable import read_file
+from .helpers.serialization.serializable import DC_TYPE_KEY, from_dict, read_file
 from .utils import (
     Dataclass,
     DataclassT,
@@ -646,7 +646,6 @@ class ArgumentParser(argparse.ArgumentParser):
                 if subgroup_field.subgroup_default is dataclasses.MISSING:
                     assert argument_options["required"]
                 else:
-                    assert argument_options["default"] is subgroup_field.subgroup_default
                     assert not is_dataclass_instance(argument_options["default"])
 
                 # TODO: Do we really need to care about this "SUPPRESS" stuff here?
@@ -674,7 +673,7 @@ class ArgumentParser(argparse.ArgumentParser):
                 # here.
                 subgroup_dict = subgroup_field.subgroup_choices
                 chosen_subgroup_key: SubgroupKey = getattr(parsed_args, dest)
-                assert chosen_subgroup_key in subgroup_dict
+                assert isinstance(chosen_subgroup_key, dict) or chosen_subgroup_key in subgroup_dict
 
                 # Changing the default value of the (now parsed) field for the subgroup choice,
                 # just so it shows (default: {chosen_subgroup_key}) on the command-line.
@@ -687,7 +686,11 @@ class ArgumentParser(argparse.ArgumentParser):
                     f"{chosen_subgroup_key!r}"
                 )
 
-                default_or_dataclass_fn = subgroup_dict[chosen_subgroup_key]
+                if isinstance(chosen_subgroup_key, dict):
+                    default_or_dataclass_fn = from_dict(cast(Type[Dataclass], None), chosen_subgroup_key)
+                else:
+                    default_or_dataclass_fn = subgroup_dict[chosen_subgroup_key]
+
                 if is_dataclass_instance(default_or_dataclass_fn):
                     # The chosen value in the subgroup dict is a frozen dataclass instance.
                     default = default_or_dataclass_fn
@@ -1124,6 +1127,11 @@ def _create_dataclass_instance(
     # None.
     # TODO: (BUG!) This doesn't distinguish the case where the defaults are passed via the
     # command-line from the case where no arguments are passed at all!
+    dc_type = constructor_args.pop(DC_TYPE_KEY, None)
+    if dc_type is not None:
+        from simple_parsing.helpers.serialization.serializable import _locate
+        constructor = _locate(dc_type)
+
     if wrapper.optional and wrapper.default is None:
         for field_wrapper in wrapper.fields:
 

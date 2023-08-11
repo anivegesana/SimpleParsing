@@ -10,6 +10,7 @@ from typing import Any, Callable, TypeVar, Union, overload
 
 from typing_extensions import TypeAlias
 
+from simple_parsing.helpers.serialization.serializable import to_dict
 from simple_parsing.utils import DataclassT, is_dataclass_instance, is_dataclass_type
 
 logger = get_logger(__name__)
@@ -111,6 +112,14 @@ def subgroups(
     metadata["subgroups"] = subgroups
     metadata["subgroup_default"] = default
     metadata["subgroup_dataclass_types"] = {}
+
+    def _encoding_fn(value: Any) -> dict:
+        """Custom encoding function that will simply represent the value as the
+        the key in the dict rather than the value itself.
+        """
+        return to_dict(value, save_dc_types=1)
+
+    kwargs.setdefault("encoding_fn", _encoding_fn)
 
     subgroup_dataclass_types: dict[Key, type[DataclassT]] = {}
     choices = subgroups.keys()

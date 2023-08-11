@@ -204,7 +204,7 @@ class SerializableMixin:
         register_decoding_fn(cls, cls.from_dict)
 
     def to_dict(
-        self, dict_factory: type[dict] = dict, recurse: bool = True, save_dc_types: bool = False
+        self, dict_factory: type[dict] = dict, recurse: bool = True, save_dc_types: int | bool = False
     ) -> dict:
         """Serializes this dataclass to a dict.
 
@@ -597,7 +597,7 @@ def save(
     obj: Any,
     path: str | Path,
     format: FormatExtension | None = None,
-    save_dc_types: bool = False,
+    save_dc_types: int | bool = False,
     **kwargs,
 ) -> None:
     """Save the given dataclass or dictionary to the given file."""
@@ -688,7 +688,7 @@ def to_dict(
     dc: DataclassT,
     dict_factory: type[dict] = dict,
     recurse: bool = True,
-    save_dc_types: bool = False,
+    save_dc_types: int | bool = False,
 ) -> dict:
     """Serializes this dataclass to a dict.
 
@@ -719,6 +719,10 @@ def to_dict(
             )
         else:
             d[DC_TYPE_KEY] = module + "." + class_name
+
+    # Decrement save_dc_types if it is an int
+    if save_dc_types is not True and save_dc_types > 0:
+        save_dc_types -= 1
 
     for f in fields(dc):
         name = f.name
