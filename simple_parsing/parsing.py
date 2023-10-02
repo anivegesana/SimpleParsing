@@ -645,8 +645,6 @@ class ArgumentParser(argparse.ArgumentParser):
 
                 if subgroup_field.subgroup_default is dataclasses.MISSING:
                     assert argument_options["required"]
-                else:
-                    assert not is_dataclass_instance(argument_options["default"])
 
                 # TODO: Do we really need to care about this "SUPPRESS" stuff here?
                 if argparse.SUPPRESS in subgroup_field.parent.defaults:
@@ -673,7 +671,6 @@ class ArgumentParser(argparse.ArgumentParser):
                 # here.
                 subgroup_dict = subgroup_field.subgroup_choices
                 chosen_subgroup_key: SubgroupKey = getattr(parsed_args, dest)
-                assert isinstance(chosen_subgroup_key, dict) or chosen_subgroup_key in subgroup_dict
 
                 # Changing the default value of the (now parsed) field for the subgroup choice,
                 # just so it shows (default: {chosen_subgroup_key}) on the command-line.
@@ -688,6 +685,8 @@ class ArgumentParser(argparse.ArgumentParser):
 
                 if isinstance(chosen_subgroup_key, dict):
                     default_or_dataclass_fn = from_dict(cast(Type[Dataclass], None), chosen_subgroup_key)
+                elif is_dataclass_instance(chosen_subgroup_key):
+                    default_or_dataclass_fn = chosen_subgroup_key
                 else:
                     default_or_dataclass_fn = subgroup_dict[chosen_subgroup_key]
 
@@ -1150,3 +1149,4 @@ def _create_dataclass_instance(
             return None
     logger.debug(f"Calling constructor: {constructor}(**{constructor_args})")
     return constructor(**constructor_args)
+
