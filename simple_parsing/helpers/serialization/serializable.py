@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import io
 import json
 import pickle
 import warnings
-from collections import OrderedDict
 from dataclasses import MISSING, Field, dataclass, fields, is_dataclass
 from functools import partial
 from importlib import import_module
@@ -36,27 +36,25 @@ logger = getLogger(__name__)
 D = TypeVar("D", bound="SerializableMixin")
 
 try:
-    import yaml
+    import ruamel.yaml
 
-    def ordered_dict_constructor(loader: yaml.Loader, node: yaml.Node):
-        # NOTE(ycho): `deep` has to be true for `construct_yaml_seq`.
-        value = loader.construct_sequence(node, deep=True)
-        return OrderedDict(*value)
+    class _MyYAML(ruamel.yaml.YAML):
+        def dump(self, data, stream=None, **kw):
+            inefficient = False
+            if stream is None:
+                inefficient = True
+                stream = io.StringIO()
+            super().dump(data, stream, **kw)
+            if inefficient:
+                return stream.getvalue()
 
-    def ordered_dict_representer(dumper: yaml.Dumper, instance: OrderedDict) -> yaml.Node:
-        # NOTE(ycho): nested list for compatibility with PyYAML's representer
-        node = dumper.represent_sequence("OrderedDict", [list(instance.items())])
-        return node
-
-    yaml.add_representer(OrderedDict, ordered_dict_representer)
-    yaml.add_constructor("OrderedDict", ordered_dict_constructor)
-    yaml.add_constructor(
-        "tag:yaml.org,2002:python/object/apply:collections.OrderedDict",
-        ordered_dict_constructor,
-    )
-
-except ImportError:
-    pass
+    yaml = _MyYAML(typ="safe")
+    yaml.default_flow_style = False
+except:
+    from unittest.mock import NonCallableMock
+    yaml = NonCallableMock()
+    yaml.load = NonCallableMock()
+    yaml.dump = NonCallableMock()
 
 
 class FormatExtension(Protocol):
@@ -84,13 +82,9 @@ class PickleExtension(FormatExtension):
 
 class YamlExtension(FormatExtension):
     def load(self, io: IO) -> Any:
-        import yaml
-
-        return yaml.safe_load(io)
+        return yaml.load(io)
 
     def dump(self, obj: Any, io: IO, **kwargs) -> None:
-        import yaml
-
         return yaml.dump(obj, io, **kwargs)
 
 
@@ -275,8 +269,8 @@ class SerializableMixin:
                 to None, in which case we try to use the appropriate loading
                 function depending on `path.suffix`:
                 {
-                    ".yml": yaml.safe_load,
-                    ".yaml": yaml.safe_load,
+                    ".yml": yaml.load,
+                    ".yaml": yaml.load,
                     ".json": json.load,
                     ".pth": torch.load,
                     ".pkl": pickle.load,
@@ -334,7 +328,7 @@ class SerializableMixin:
             cls (Type[D]): A dataclass type to load.
             path (Union[str, Path]): Path to a yaml-formatted file.
             load_fn ([type], optional): Loading function to use. Defaults to
-                None, in which case `yaml.safe_load` is used.
+                None, in which case `yaml.load` is used.
 
         Returns:
             D: an instance of the dataclass.
@@ -492,8 +486,8 @@ def load(
             to None, in which case we try to use the appropriate loading
             function depending on `path.suffix`:
             {
-                ".yml": yaml.safe_load,
-                ".yaml": yaml.safe_load,
+                ".yml": yaml.load,
+                ".yaml": yaml.load,
                 ".json": json.load,
                 ".pth": torch.load,
                 ".pkl": pickle.load,
@@ -571,9 +565,7 @@ def loads_yaml(
     load_fn: LoadsFn | None = None,
     **kwargs,
 ) -> DataclassT:
-    import yaml
-
-    load_fn = load_fn or yaml.safe_load
+    load_fn = load_fn or yaml.load
     return loads(cls, s, drop_extra_fields=drop_extra_fields, load_fn=partial(load_fn, **kwargs))
 
 
@@ -581,8 +573,8 @@ def read_file(path: str | Path) -> dict:
     """Returns the contents of the given file as a dictionary.
     Uses the right function depending on `path.suffix`:
     {
-        ".yml": yaml.safe_load,
-        ".yaml": yaml.safe_load,
+        ".yml": yaml.load,
+        ".yaml": yaml.load,
         ".json": json.load,
         ".pth": torch.load,
         ".pkl": pickle.load,
@@ -630,15 +622,13 @@ def load_yaml(
         cls (Type[T]): A dataclass type to load.
         path (Union[str, Path]): Path to a yaml-formatted file.
         load_fn ([type], optional): Loading function to use. Defaults to
-            None, in which case `yaml.safe_load` is used.
+            None, in which case `yaml.load` is used.
 
     Returns:
         T: an instance of the dataclass.
     """
-    import yaml
-
     if load_fn is None:
-        load_fn = yaml.safe_load
+        load_fn = yaml.load
     return load(cls, path, drop_extra_fields=drop_extra_fields, load_fn=partial(load_fn, **kwargs))
 
 
@@ -655,8 +645,6 @@ def dump_json(dc, fp: IO[str], dump_fn: DumpFn = json.dump, **kwargs) -> None:
 
 
 def dump_yaml(dc, fp: IO[str], dump_fn: DumpFn | None = None, **kwargs) -> None:
-    import yaml
-
     if dump_fn is None:
         dump_fn = yaml.dump
     return dump(dc, fp, dump_fn=partial(dump_fn, **kwargs))
@@ -674,10 +662,8 @@ def dumps_json(dc, dump_fn: DumpsFn = json.dumps, **kwargs) -> str:
 
 
 def dumps_yaml(dc, dump_fn: DumpsFn | None = None, **kwargs) -> str:
-    import yaml
-
     if dump_fn is None:
-        dump_fn = yaml.dump
+        dump_fn = yaml.dump  # TODO: FIX
     return dumps(dc, dump_fn=partial(dump_fn, **kwargs))
 
 

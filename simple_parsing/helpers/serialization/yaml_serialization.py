@@ -4,9 +4,7 @@ from logging import getLogger
 from pathlib import Path
 from typing import IO
 
-import yaml
-
-from .serializable import D, Serializable
+from .serializable import D, Serializable, yaml
 
 logger = getLogger(__name__)
 
@@ -15,7 +13,7 @@ class YamlSerializable(Serializable):
     """Convenience class, just sets different `load_fn` and `dump_fn` defaults
     for the `dump`, `dumps`, `load`, `loads` methods of `Serializable`.
 
-    Uses the `yaml.safe_load` and `yaml.dump` for loading and dumping.
+    Uses the `yaml.load` and `yaml.dump` for loading and dumping.
 
     Requires the pyyaml package.
     """
@@ -31,7 +29,7 @@ class YamlSerializable(Serializable):
         cls: type[D],
         path: Path | str | IO[str],
         drop_extra_fields: bool | None = None,
-        load_fn=yaml.safe_load,
+        load_fn=yaml.load,
         **kwargs,
     ) -> D:
         return super().load(path, drop_extra_fields=drop_extra_fields, load_fn=load_fn, **kwargs)
@@ -41,7 +39,7 @@ class YamlSerializable(Serializable):
         cls: type[D],
         s: str,
         drop_extra_fields: bool | None = None,
-        load_fn=yaml.safe_load,
+        load_fn=yaml.load,
         **kwargs,
     ) -> D:
         return super().loads(s, drop_extra_fields=drop_extra_fields, load_fn=load_fn, **kwargs)
@@ -51,7 +49,7 @@ class YamlSerializable(Serializable):
         cls: type[D],
         fp: IO[str],
         drop_extra_fields: bool | None = None,
-        load_fn=yaml.safe_load,
+        load_fn=yaml.load,
         **kwargs,
     ) -> D:
         return super()._load(fp, drop_extra_fields=drop_extra_fields, load_fn=load_fn, **kwargs)

@@ -5,10 +5,9 @@ from pathlib import Path
 from typing import List, Optional
 
 import pytest
-import yaml
 
 from simple_parsing import Serializable
-from simple_parsing.helpers.serialization.serializable import dumps_yaml, loads_yaml
+from simple_parsing.helpers.serialization.serializable import dumps_yaml, loads_yaml, yaml
 
 
 class LoggingTypes(Enum):
@@ -61,7 +60,7 @@ def test_decode_enum_saved_by_name():
                 """
             )
         )
-    file_config = Parameters.load("conf.yaml", load_fn=yaml.safe_load)
+    file_config = Parameters.load("conf.yaml", load_fn=yaml.load)
     assert file_config == Parameters(hparams=Hparams(xyz=[LoggingTypes.JSONL]), p=Path("/tmp"))
 
 
