@@ -465,7 +465,10 @@ def decode_enum(item_type: type[Enum]) -> Callable[[str], Enum]:
     """
 
     def _decode_enum(val: str) -> Enum:
-        return item_type[val]
+        try:
+            return item_type[val]
+        except:
+            return item_type(val)
 
     return _decode_enum
 
